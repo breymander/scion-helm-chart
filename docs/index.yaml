@@ -8,6 +8,34 @@ entries:
           url: https://github.com/GoogleCloudPlatform/scion
     apiVersion: v2
     appVersion: 0.2.20
+    created: "2026-09-18T21:22:28.520299477Z"
+    description: Scion agent-orchestration hub, for self-managed (non-GKE) Kubernetes
+      clusters.
+    digest: 677e59814fcea8c298b54318bfa621897ffcb25a9c9e16ea4d86f2f881de314a
+    home: https://github.com/breymander/scion-helm-chart
+    keywords:
+    - scion
+    - agents
+    - ai
+    - orchestration
+    maintainers:
+    - name: breymander
+      url: https://github.com/breymander
+    name: scion
+    sources:
+    - https://github.com/breymander/scion-helm-chart
+    - https://github.com/GoogleCloudPlatform/scion
+    type: application
+    urls:
+    - https://github.com/breymander/scion-helm-chart/releases/download/scion-0.1.1/scion-0.1.1.tgz
+    version: 0.1.1
+  - annotations:
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Upstream Scion
+          url: https://github.com/GoogleCloudPlatform/scion
+    apiVersion: v2
+    appVersion: 0.2.20
     created: "2026-09-18T20:22:15.914897842Z"
     description: Scion agent-orchestration hub, for self-managed (non-GKE) Kubernetes
       clusters.
@@ -29,4 +57,4 @@ entries:
     urls:
     - https://github.com/breymander/scion-helm-chart/releases/download/scion-0.1.0/scion-0.1.0.tgz
     version: 0.1.0
-generated: "2026-09-18T20:22:15.91370713Z"
+generated: "2026-09-18T21:22:28.519024058Z"
