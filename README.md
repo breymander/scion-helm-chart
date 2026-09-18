@@ -90,7 +90,18 @@ placeholder on every route. (Measured against
 `ghcr.io/homebrew-scion/scion-hub:v0.2.20`: it logs *"This binary was built
 without web assets"* at startup and answers `/` with that page.)
 
-Two ways forward:
+Three ways forward:
+
+**Use a prebuilt one.** `ghcr.io/breymander/scion-hub` is exactly this image:
+the same upstream base, with `scion` and `sciontool` rebuilt from a single
+upstream commit without the `no_embed_web` tag. Currently `linux/arm64` only.
+Built by [breymander/scion-hub-image](https://github.com/breymander/scion-hub-image).
+
+```yaml
+image:
+  repository: ghcr.io/breymander/scion-hub
+  tag: 0c07fde
+```
 
 **Build an image with assets embedded** (`make web && make build`, i.e. no
 `no_embed_web` tag), then point `image.repository` at it.
