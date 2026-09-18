@@ -1,0 +1,60 @@
+{{ .Chart.Name }} {{ .Chart.Version }} installed as {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+  Hub URL:    {{ .Values.hub.baseUrl }}
+  Image:      {{ include "scion.image" . }}
+  Agent pods: namespace {{ include "scion.agentNamespace" . }}, images from {{ .Values.agents.imageRegistry }}
+  State:      {{ if .Values.persistence.enabled }}PVC {{ include "scion.claimName" . }} ({{ .Values.persistence.size }}){{ else }}emptyDir - NOT PERSISTED{{ end }}
+
+Watch it come up:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "scion.fullname" . }}
+
+{{ if eq .Values.auth.mode "oauth" }}
+{{- if .Values.auth.oauth.github.clientId }}
+Register this exact callback URL on your GitHub OAuth app, or login will fail
+with a redirect_uri mismatch:
+
+  {{ .Values.hub.baseUrl }}/auth/callback/github
+{{- end }}
+{{- if .Values.auth.oauth.google.clientId }}
+Register this exact callback URL on your Google OAuth client:
+
+  {{ .Values.hub.baseUrl }}/auth/callback/google
+{{- end }}
+{{ end }}
+Access: {{ .Values.auth.userAccessMode }}{{ if .Values.hub.adminEmails }}, super-admins {{ join ", " .Values.hub.adminEmails }}{{ end }}.
+
+{{- if not .Values.persistence.enabled }}
+
+WARNING: persistence.enabled is false. The hub keeps its SQLite database at
+{{ include "scion.scionDir" . }}/hub.db, which is inside the emptyDir this
+release just mounted. Every restart, eviction and upgrade will reset the hub -
+projects, sessions and agent history included.
+{{- end }}
+
+{{- if and (eq .Values.auth.userAccessMode "invite_only") (not .Values.hub.adminEmails) }}
+
+WARNING: userAccessMode is invite_only and hub.adminEmails is empty. Nobody can
+log in unless the database already holds invited or active users.
+{{- end }}
+
+{{- if eq .Values.auth.userAccessMode "open" }}
+
+WARNING: userAccessMode is open. Anyone your identity provider authenticates
+can log in and have the hub run containers with your model credentials.
+{{- end }}
+
+{{- if not .Values.agents.credentials.create }}
+{{- if not .Values.agents.credentials.existingSecret }}
+
+NOTE: no model credentials are configured, so agents will have nothing to
+authenticate with. Set agents.credentials.anthropicApiKey (or .existingSecret).
+{{- end }}
+{{- end }}
+
+{{- if .Values.hub.webAssetsDir }}
+
+NOTE: hub.webAssetsDir is set, so the hub serves the client from
+{{ .Values.hub.webAssetsDir }} rather than from the binary. Make sure a volume
+actually provides that path, or the UI will 404.
+{{- end }}

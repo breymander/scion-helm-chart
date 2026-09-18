@@ -1,0 +1,12 @@
+*.tgz
+charts/
+Chart.lock
+docs/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+kubeconfig
+*.kubeconfig
+secrets.yaml
+*-secrets.yaml

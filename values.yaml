@@ -1,0 +1,235 @@
+# Default values for the scion chart.
+#
+# Three values have no usable default and must be set: image.repository,
+# hub.hubId and hub.baseUrl. The chart fails the render rather than guessing.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  # A hub image built WITH web assets embedded.
+  #
+  # The published ghcr.io/homebrew-scion/scion-hub is NOT such an image: it
+  # derives from scion-base, which builds the binary with -tags no_embed_web,
+  # so the binary logs "This binary was built without web assets. The web UI
+  # will not be available" and --enable-web serves nothing. Either build your
+  # own (see the chart README) or set hub.webAssetsDir to serve the client from
+  # a mounted directory.
+  repository: ""
+  # Defaults to .Chart.AppVersion.
+  tag: ""
+  # A digest, when set, takes precedence over tag.
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+hub:
+  # Stable identifier for this hub. Changing it on an existing deployment
+  # orphans the state keyed to the old one.
+  hubId: ""
+  # Display name in the web UI.
+  name: Scion
+  # Absolute external URL. MUST be https - the hub enforces that, and it builds
+  # its OAuth redirect_uri from this value, so it has to match what the
+  # provider has registered.
+  baseUrl: ""
+  # Home directory inside the container. The hub's state root is <home>/.scion.
+  home: /home/scion
+  webPort: 8080
+  # Serve the web UI. Turning this off leaves the JSON API on the same port.
+  enableWeb: true
+  # Serve client assets from a directory instead of the binary's embedded copy.
+  # The only way to get a UI out of a stock -tags no_embed_web image. Pair it
+  # with extraVolumes/extraVolumeMounts carrying web/dist/client.
+  webAssetsDir: ""
+  # Super-admin email addresses. These bypass every access check, so this is
+  # also the break-glass list: with auth.userAccessMode invite_only and an
+  # empty list, a fresh install has nobody who can log in.
+  adminEmails: []
+  # Appended to the hub's argv.
+  extraArgs: []
+  # Extra container env vars, as Kubernetes EnvVar objects. Agent credentials
+  # belong in agents.credentials instead.
+  extraEnv: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  resources:
+    requests:
+      cpu: 250m
+      memory: 768Mi
+    limits:
+      memory: 2Gi
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# The hub keeps its SQLite database and local blob store under <hub.home>/.scion.
+# With persistence disabled that directory is an emptyDir, and every restart,
+# eviction or upgrade resets the hub - projects, sessions and agent history.
+persistence:
+  enabled: true
+  # Bind an existing claim. Suppresses size, storageClass and accessModes.
+  existingClaim: ""
+  size: 10Gi
+  # Empty means the cluster's default StorageClass.
+  storageClass: ""
+  # The Deployment is single-replica with strategy Recreate, so ReadWriteOnce
+  # is enough.
+  accessModes:
+    - ReadWriteOnce
+  # Kept by default so `helm uninstall` does not destroy the hub database.
+  resourcePolicyKeep: true
+
+database:
+  # sqlite is the only supported driver here. Upstream's postgres path turns on
+  # an HA preflight that upstream itself documents as unlanded, and the hub
+  # aborts before serving.
+  driver: sqlite
+  maxOpenConns: 25
+  maxIdleConns: 5
+  connMaxLifetime: 30m
+  connMaxIdleTime: 5m
+
+storage:
+  # local keeps blobs on the PVC. gcs is deliberately not offered.
+  provider: local
+
+auth:
+  # oauth: the hub runs its own OAuth login.
+  # proxy: an authenticating proxy in front of the hub sets a trusted header.
+  mode: oauth
+
+  # WHO IS ALLOWED IN, once the identity provider has authenticated them.
+  #
+  #   invite_only       - only invited/active users, plus hub.adminEmails.
+  #   domain_restricted - only auth.authorizedDomains, plus hub.adminEmails.
+  #   open              - anyone the provider authenticates.
+  #
+  # The default is deliberately NOT upstream's. checkUserAuthorized
+  # (pkg/hub/handlers_auth.go) ends in `default: // "open" or empty -> return
+  # true`, so an unset mode means anyone with an account at your OAuth provider
+  # - for GitHub, any GitHub user alive - can log in and have the hub run
+  # containers with your model credentials.
+  #
+  # Note that these are the values the code actually switches on. Upstream's
+  # settings.yaml.example documents "open"/"domain"/"allowlist"; "allowlist" is
+  # not implemented and falls through to open.
+  userAccessMode: invite_only
+  authorizedDomains: []
+  # Required acknowledgement when userAccessMode is "open".
+  acknowledgeOpenAccess: false
+
+  # Cookie signing key. Generated if left empty and no existingSecret is given.
+  sessionSecret: ""
+  # Take the session secret from an existing Secret instead.
+  existingSecret: ""
+  existingSecretKey: ""
+
+  # Web (browser) OAuth client credentials. Required when mode is oauth.
+  oauth:
+    github:
+      clientId: ""
+      clientSecret: ""
+    google:
+      clientId: ""
+      clientSecret: ""
+
+  # Only read when mode is proxy.
+  proxy:
+    header: X-Forwarded-Email
+    trustedProxies: []
+
+agents:
+  # Registry the hub pulls agent harness images from.
+  imageRegistry: ghcr.io/homebrew-scion
+  # Namespace agent pods run in. Defaults to the release namespace. A separate
+  # namespace gives agents their own RBAC boundary; the chart grants the hub
+  # rights there either way.
+  namespace: ""
+  # Lets the hub list pods across all namespaces, which needs a ClusterRole.
+  listAllNamespaces: false
+  # Model credentials. The hub reads these from its own environment and hands
+  # them to agent containers.
+  credentials:
+    create: true
+    # Use an existing Secret instead of creating one. Its keys are injected
+    # verbatim as environment variables.
+    existingSecret: ""
+    anthropicApiKey: ""
+    geminiApiKey: ""
+    openaiApiKey: ""
+    # Any additional KEY: value pairs to inject.
+    extra: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  # Role (and, with agents.listAllNamespaces, ClusterRole) letting the hub
+  # create and attach to agent pods.
+  create: true
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  # Defaults to the host in hub.baseUrl.
+  host: ""
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls:
+    enabled: true
+    # Defaults to <fullname>-tls.
+    secretName: ""
+
+probes:
+  startup:
+    enabled: true
+    periodSeconds: 5
+    failureThreshold: 60
+    timeoutSeconds: 3
+  readiness:
+    enabled: true
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    enabled: false
+    periodSeconds: 20
+    failureThreshold: 6
+    timeoutSeconds: 3
+
+# fsGroup is load-bearing, not boilerplate. A freshly provisioned PVC is
+# mounted root:root 0755; the hub runs as uid 1000 and has to create hub.db
+# inside it. Without fsGroup the hub cannot write its own database.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+config:
+  # Deep-merged over the settings.yaml the chart renders, for anything this
+  # chart does not model.
+  extra: {}
+  # Supply the entire settings.yaml from an existing Secret instead. The key
+  # must be settings.yaml.
+  existingSecret: ""

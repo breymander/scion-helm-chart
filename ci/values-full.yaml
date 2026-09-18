@@ -1,0 +1,43 @@
+image:
+  repository: ghcr.io/example/scion-hub
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  pullSecrets:
+    - name: ghcr-pull-secret
+hub:
+  hubId: ci-full
+  baseUrl: https://ci-full.example.com
+  adminEmails:
+    - ci@example.com
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+auth:
+  oauth:
+    google:
+      clientId: ci-id
+      clientSecret: ci-secret
+agents:
+  namespace: ci-agents
+  listAllNamespaces: true
+  credentials:
+    anthropicApiKey: sk-ci
+    extra:
+      CUSTOM_TOKEN: abc
+persistence:
+  size: 50Gi
+  storageClass: longhorn
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/issuer: letsencrypt-prod
+probes:
+  liveness:
+    enabled: true
+config:
+  extra:
+    server:
+      log_level: debug

@@ -1,0 +1,95 @@
+{{- if .Values.rbac.create }}
+{{- /*
+  What the hub does with these: it creates an agent Pod, streams the workspace
+  in over pods/exec with tar, attaches to a tmux session inside it, streams the
+  workspace back out, then deletes the Pod and the Secret holding that agent's
+  credentials.
+
+  Deliberately absent: secretproviderclasses (secrets-store.csi.x-k8s.io).
+  That is the GKE Secret Store CSI driver, and upstream grants it here. On a
+  self-managed cluster the CRD does not exist, and a rule naming an absent API
+  group is silently useless rather than harmful - but it is still a claim about
+  the cluster that is not true.
+*/ -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-agents" (include "scion.fullname" .) }}
+  namespace: {{ include "scion.agentNamespace" . }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec", "pods/attach", "pods/portforward"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-agents" (include "scion.fullname" .) }}
+  namespace: {{ include "scion.agentNamespace" . }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-agents" (include "scion.fullname" .) }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "scion.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- if .Values.agents.listAllNamespaces }}
+---
+{{- /*
+  Only rendered when the hub is asked to see pods cluster-wide. Most installs
+  do not need this, and it is the one permission in this chart that reaches
+  outside its own namespaces.
+*/ -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-%s-namespaces" .Release.Namespace (include "scion.fullname" .) }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-namespaces" .Release.Namespace (include "scion.fullname" .) }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s-%s-namespaces" .Release.Namespace (include "scion.fullname" .) }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "scion.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,19 @@
+image:
+  repository: ghcr.io/example/scion-hub
+  tag: ci
+hub:
+  hubId: ci-proxy
+  baseUrl: https://ci-proxy.example.com
+  adminEmails:
+    - ci@example.com
+auth:
+  mode: proxy
+  userAccessMode: domain_restricted
+  authorizedDomains:
+    - example.com
+  proxy:
+    header: X-Forwarded-Email
+    trustedProxies:
+      - 10.0.0.0/8
+persistence:
+  enabled: false

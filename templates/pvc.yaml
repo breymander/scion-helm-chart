@@ -1,0 +1,23 @@
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-home" (include "scion.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+  {{- if .Values.persistence.resourcePolicyKeep }}
+  annotations:
+    # Survives `helm uninstall`, because this volume is the hub database.
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+{{- end }}

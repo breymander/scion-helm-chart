@@ -1,0 +1,91 @@
+name: Lint and Test Chart
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Lint
+        run: helm lint . --values ci/values-minimal.yaml
+
+      - name: Render every ci/ values file
+        run: |
+          set -e
+          for f in ci/values-*.yaml; do
+            echo "--- $f"
+            helm template scion . --namespace scion --values "$f" > "/tmp/$(basename "$f").out"
+          done
+
+      - name: Validate rendered manifests against the Kubernetes API schema
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar xz kubeconform
+          for f in /tmp/values-*.out; do
+            echo "--- $f"
+            ./kubeconform -strict -summary -ignore-missing-schemas "$f"
+          done
+
+      # Each of these is a mistake that would otherwise produce a hub that comes
+      # up healthy and behaves wrongly. They must fail the render.
+      - name: Guards must reject bad values
+        run: |
+          set +e
+          fail=0
+          assert_rejects() {
+            desc="$1"; shift
+            out=$(helm template scion . --namespace scion --values ci/values-minimal.yaml "$@" 2>&1)
+            if [ $? -eq 0 ]; then
+              echo "FAIL: $desc was accepted"
+              fail=1
+            else
+              echo "ok: $desc rejected"
+            fi
+          }
+          assert_rejects "non-https baseUrl"        --set hub.baseUrl=http://e.example.com
+          assert_rejects "unimplemented allowlist"  --set auth.userAccessMode=allowlist
+          assert_rejects "open access unacknowledged" --set auth.userAccessMode=open
+          assert_rejects "postgres driver"          --set database.driver=postgres
+          assert_rejects "gcs storage"              --set storage.provider=gcs
+          assert_rejects "half an oauth credential" --set auth.oauth.github.clientSecret=
+          assert_rejects "unknown value key"        --set persistence.enabledd=true
+          exit $fail
+
+      - name: Rendered settings must not claim GKE
+        run: |
+          set -e
+          for f in /tmp/values-*.out; do
+            if grep -qE '^\s+gke:' "$f"; then
+              echo "FAIL: $f renders a gke key"; exit 1
+            fi
+          done
+          echo "ok: no gke key in any rendering"
+
+      - name: Container args must start with the binary name
+        run: |
+          set -e
+          for f in /tmp/values-*.out; do
+            if ! grep -qE '^\s+- scion$' "$f"; then
+              echo "FAIL: $f does not pass the scion binary name in args"; exit 1
+            fi
+          done
+          echo "ok: args name the binary"
+
+      - name: Pod must set fsGroup
+        run: |
+          set -e
+          for f in /tmp/values-*.out; do
+            grep -q 'fsGroup: 1000' "$f" || { echo "FAIL: $f has no fsGroup"; exit 1; }
+          done
+          echo "ok: fsGroup set"

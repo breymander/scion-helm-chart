@@ -1,0 +1,5 @@
+# Chart Releaser configuration
+# See: https://github.com/helm/chart-releaser-action
+owner: breymander
+git-repo: scion-helm-chart
+remote: origin

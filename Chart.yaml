@@ -1,0 +1,29 @@
+apiVersion: v2
+name: scion
+description: Scion agent-orchestration hub, for self-managed (non-GKE) Kubernetes clusters.
+type: application
+
+# The chart's own version, bumped independently of appVersion.
+version: 0.1.0
+
+# The upstream Scion release this chart is written against, and the default
+# for image.tag.
+appVersion: "0.2.20"
+
+home: https://github.com/breymander/scion-helm-chart
+sources:
+  - https://github.com/breymander/scion-helm-chart
+  - https://github.com/GoogleCloudPlatform/scion
+maintainers:
+  - name: breymander
+    url: https://github.com/breymander
+keywords:
+  - scion
+  - agents
+  - ai
+  - orchestration
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Upstream Scion
+      url: https://github.com/GoogleCloudPlatform/scion

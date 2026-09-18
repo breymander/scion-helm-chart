@@ -1,0 +1,17 @@
+{{- include "scion.assert" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-env" (include "scion.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+data:
+  HOME: {{ .Values.hub.home | quote }}
+  SCION_SERVER_BASE_URL: {{ required "hub.baseUrl is required and must be an https:// URL" .Values.hub.baseUrl | quote }}
+  # Signing keys must survive a restart. They live under the hub's state root,
+  # which is why persistence.enabled matters for more than the database.
+  SCION_REQUIRE_STABLE_SIGNING_KEY: "true"
+  # Empty on purpose: it stops the Kubernetes client from looking for a
+  # kubeconfig file and makes it use the pod's in-cluster service account.
+  KUBECONFIG: ""

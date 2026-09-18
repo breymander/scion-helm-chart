@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "scion.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "scion.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  {{- /*
+    Recreate, not RollingUpdate, and not a value.
+
+    The hub is single-writer: one SQLite file and one local blob store on a
+    ReadWriteOnce claim. A rolling update would ask the new pod to attach a
+    volume the old pod still holds, which either deadlocks the rollout or - on
+    a storage backend willing to multi-attach - puts two writers on one
+    database file.
+  */}}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "scion.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Roll the pod when configuration changes; settings.yaml is only read
+        # at startup.
+        checksum/settings: {{ include (print $.Template.BasePath "/secret-settings.yaml") . | sha256sum }}
+        checksum/env: {{ include (print $.Template.BasePath "/configmap-env.yaml") . | sha256sum }}
+        {{- with .Values.hub.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "scion.selectorLabels" . | nindent 8 }}
+        {{- with .Values.hub.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "scion.serviceAccountName" . }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: hub
+          image: {{ include "scion.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- /*
+            The image's ENTRYPOINT is ["sciontool", "init", "--"], so args are
+            the command to exec and MUST begin with the binary name. Upstream's
+            chart omits it and passes ["server", "start", ...], which resolves
+            to a binary named "server".
+          */}}
+          args:
+            - scion
+            - server
+            - start
+            - --foreground
+            - --hosted
+            - --enable-hub
+            - --enable-runtime-broker
+            - --host
+            - 0.0.0.0
+            - --auto-provide
+            - --global
+            {{- if .Values.hub.enableWeb }}
+            - --enable-web
+            - --web-port
+            - {{ .Values.hub.webPort | quote }}
+            {{- with .Values.hub.webAssetsDir }}
+            - --web-assets-dir
+            - {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.hub.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.hub.webPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ printf "%s-env" (include "scion.fullname" .) }}
+            - secretRef:
+                name: {{ include "scion.sessionSecretName" . }}
+            {{- if or .Values.agents.credentials.existingSecret .Values.agents.credentials.create }}
+            - secretRef:
+                name: {{ include "scion.credentialsSecretName" . }}
+                optional: true
+            {{- end }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- with .Values.hub.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.hub.resources | nindent 12 }}
+          volumeMounts:
+            - name: scion-home
+              mountPath: {{ include "scion.scionDir" . | quote }}
+            - name: settings
+              mountPath: {{ printf "%s/settings.yaml" (include "scion.scionDir" .) | quote }}
+              subPath: settings.yaml
+              readOnly: true
+            {{- with .Values.hub.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: scion-home
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "scion.claimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: settings
+          secret:
+            secretName: {{ include "scion.settingsSecretName" . }}
+            # 0444, not 0600: a Secret volume is projected root:root regardless
+            # of the pod's securityContext, so a non-root uid needs world-read
+            # to see its own configuration.
+            defaultMode: 0444
+        {{- with .Values.hub.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.hub.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hub.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hub.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

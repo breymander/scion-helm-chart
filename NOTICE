@@ -1,0 +1,6 @@
+This Helm chart deploys Scion (https://github.com/GoogleCloudPlatform/scion),
+which is Copyright Google LLC and licensed under the Apache License 2.0.
+
+This chart is an independent rewrite of the upstream `deploy/helm/scion-hub`
+chart for self-managed Kubernetes clusters. It is not an official Google
+product and is not affiliated with or endorsed by Google.

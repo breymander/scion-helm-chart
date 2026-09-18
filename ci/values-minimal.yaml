@@ -1,0 +1,13 @@
+image:
+  repository: ghcr.io/example/scion-hub
+  tag: ci
+hub:
+  hubId: ci-minimal
+  baseUrl: https://ci-minimal.example.com
+  adminEmails:
+    - ci@example.com
+auth:
+  oauth:
+    github:
+      clientId: ci-id
+      clientSecret: ci-secret
