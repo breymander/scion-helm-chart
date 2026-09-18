@@ -4,7 +4,7 @@ description: Scion agent-orchestration hub, for self-managed (non-GKE) Kubernete
 type: application
 
 # The chart's own version, bumped independently of appVersion.
-version: 0.1.0
+version: 0.1.1
 
 # The upstream Scion release this chart is written against, and the default
 # for image.tag.

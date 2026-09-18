@@ -78,6 +78,18 @@ This binary was built without web assets. The web UI will not be available.
 (`linux/amd64` + `linux/arm64`) and the hub's JSON API works fine — but there is
 no dashboard.
 
+Verify which you have — the hub reports it on `/healthz`:
+
+```console
+$ curl -s https://scion.example.com/healthz | jq .web
+{ "status": "ok", "assetsDir": "", "assetsEmbedded": false }
+```
+
+`"assetsEmbedded": false` means the UI will serve a "Web UI Not Available"
+placeholder on every route. (Measured against
+`ghcr.io/homebrew-scion/scion-hub:v0.2.20`: it logs *"This binary was built
+without web assets"* at startup and answers `/` with that page.)
+
 Two ways forward:
 
 **Build an image with assets embedded** (`make web && make build`, i.e. no

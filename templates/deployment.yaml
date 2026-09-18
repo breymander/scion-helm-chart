@@ -103,7 +103,7 @@ spec:
           {{- if .Values.probes.startup.enabled }}
           startupProbe:
             httpGet:
-              path: /readyz
+              path: {{ .Values.probes.path }}
               port: http
             periodSeconds: {{ .Values.probes.startup.periodSeconds }}
             failureThreshold: {{ .Values.probes.startup.failureThreshold }}
@@ -112,7 +112,7 @@ spec:
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
             httpGet:
-              path: /readyz
+              path: {{ .Values.probes.path }}
               port: http
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
@@ -121,7 +121,7 @@ spec:
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: {{ .Values.probes.path }}
               port: http
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}

@@ -192,6 +192,21 @@ ingress:
     secretName: ""
 
 probes:
+  # Path all three probes query.
+  #
+  # /readyz is the only endpoint with real readiness semantics: the hub's
+  # handleReadyz answers 503 until it is actually ready. /healthz always
+  # answers 200 and reports trouble only in its JSON body ("status":
+  # "degraded"), so it cannot fail a probe and is a diagnostic, not a check.
+  #
+  # CAVEAT, measured against ghcr.io/homebrew-scion/scion-hub:v0.2.20: on that
+  # build the web server's catch-all handler shadows /readyz and answers 200
+  # with the "Web UI Not Available" HTML page, so these probes degrade to "the
+  # port is open and something answered". Current upstream forwards /readyz to
+  # the hub handler (pkg/hub/web.go), which restores the 503. Verify with:
+  #   kubectl exec deploy/<release> -- curl -s -o /dev/null -w '%{content_type}' localhost:8080/readyz
+  # A JSON content type means the probe is real; text/html means it is not.
+  path: /readyz
   startup:
     enabled: true
     periodSeconds: 5
